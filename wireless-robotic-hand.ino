@@ -7,7 +7,7 @@
 
   #include        <NewServo.h>        // Ghassan Library
   NewServo        finger[5];          // 5 Servos
-  unsigned int    prvValue[5];        // Previous Value Of The Servo Control
+  uint8_t         prvValue[5];        // Previous Value Of The Servo Control
 
   unsigned long   scanPeriod;         // Used For Count Time Between Operations
 
@@ -41,11 +41,12 @@
 
     // Min Reading Value (724 - 725) , Max Reading Value (800, 835)
     if(millis() - scanPeriod >= 10) {
-      controlFingers(finger[0], prvValue[0], A0, 724, 835, 0, 130);
-      controlFingers(finger[1], prvValue[1], A1, 724, 835, 0, 130);
-      controlFingers(finger[2], prvValue[2], A2, 724, 835, 0, 130);
-      controlFingers(finger[3], prvValue[3], A3, 724, 835, 0, 130);
-      controlFingers(finger[4], prvValue[4], A4, 724, 835, 0, 130);
+
+      // Looping Through Fingers
+      for(int i=0; i<5; i++) {
+        controlFingers(finger[i], prvValue[i], i+14, 724, 835, 0, 130);
+      }
+
     }
     
   }
@@ -54,7 +55,7 @@
 //  Function To Control A Finger
 //==================================================================
 
-  void controlFingers(NewServo &servo, unsigned int &previous, uint8_t analogValue, unsigned int inMinValue, unsigned int inMaxValue, unsigned int outMinValue, unsigned int outMaxValue) {
+  void controlFingers(NewServo &servo, uint8_t &previous, uint8_t analogValue, unsigned int inMinValue, unsigned int inMaxValue, unsigned int outMinValue, unsigned int outMaxValue) {
 
       // Scan Period
       scanPeriod = millis();
@@ -66,6 +67,7 @@
       // Do Change If Not Maching
       if(previous != value) {
         previous = value;
+        Bluetooth.write(prvValue, 5);
         Serial.println(previous);
         servo.move(previous);
       }
@@ -151,6 +153,31 @@
 
       // Print 
       Serial.println("Bluetooth   : " + String(x));
+
+    }
+
+  }
+
+//==================================================================
+//  Receive Data From Bluetooth
+//==================================================================
+
+  void receiveData() {
+
+    if (Bluetooth.available() >= 5) {
+      
+      // Read the received data into an array
+      byte receivedData[5];
+      Bluetooth.readBytes(receivedData, 5);
+
+      // Move the servos based on the received byte values
+      Serial.print("Received data : ");
+      for(int i=0; i<5; i++) {
+        // Print the received byte values
+        Serial.print(receivedData[i]); Serial.print(" ");
+        finger[i].move(receivedData[i]);       // Move Servo To Initial Position
+      }
+      Serial.println();
 
     }
 
