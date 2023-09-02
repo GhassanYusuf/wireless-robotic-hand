@@ -51,7 +51,7 @@
   }
 
 //==================================================================
-//  Serial Control Fingers
+//  Function To Control A Finger
 //==================================================================
 
   void controlFingers(NewServo &servo, unsigned int &previous, uint8_t analogValue, unsigned int inMinValue, unsigned int inMaxValue, unsigned int outMinValue, unsigned int outMaxValue) {
@@ -63,6 +63,7 @@
       unsigned int  value = constrain(analogRead(analogValue), inMinValue, inMaxValue);
                     value = map(value, inMinValue, inMaxValue, outMinValue, outMaxValue);
 
+      // Do Change If Not Maching
       if(previous != value) {
         previous = value;
         Serial.println(previous);
