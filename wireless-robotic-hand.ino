@@ -7,9 +7,20 @@
 
   #include        <NewServo.h>        // Ghassan Library
   NewServo        finger[5];          // 5 Servos
-  uint8_t         prvValue[5];        // Previous Value Of The Servo Control
+
+  struct AnaInput {
+    uint8_t pin = 0;
+    unsigned int prv = 0;
+    unsigned int max = 0;
+    unsigned int min = 1024;
+  };
+
+  AnaInput        fingerValue[5];
+  unsigned int    prvValue[5];        // Previous Value Of The Servo Control
+  unsigned int    BluetoothData[5];   // To Collect The Information To Be Sent Via Blue Tooth
 
   unsigned long   scanPeriod;         // Used For Count Time Between Operations
+  // [ pin : 14, min : 150, max : 298 ] - [ pin : 15, min : 111, max : 259 ] - [ pin : 16, min : 76, max : 179 ] - [ pin : 17, min : 85, max : 178 ] - [ pin : 18, min : 41, max : 80 ]
 
 //==================================================================
 //  SETUP
@@ -21,14 +32,39 @@
     Serial.begin(38400);        // Serial Communication
     Bluetooth.begin(38400);     // Bluetooth ComPort
     
+    // Thumb Finger   : Setting Pins Of The Values
+    fingerValue[0].pin = 14;
+    fingerValue[0].min = 150;
+    fingerValue[0].max = 298;
+
+    // Fore Finger    : Setting Pins Of The Values
+    fingerValue[1].pin = 15;
+    fingerValue[1].min = 111;
+    fingerValue[1].max = 259;
+    
+    // Middle Finger  : Setting Pins Of The Values
+    fingerValue[2].pin = 16;
+    fingerValue[2].min = 76;
+    fingerValue[2].max = 179;
+    
+    // Ring Finger    : Setting Pins Of The Values
+    fingerValue[3].pin = 17;
+    fingerValue[3].min = 85;
+    fingerValue[3].max = 178;
+    
+    // Little Finger  : Setting Pins Of The Values
+    fingerValue[4].pin = 18;
+    fingerValue[4].min = 41;
+    fingerValue[4].max = 80;
+
     // Servo Setup Loop
     for(int i=0; i<5; i++) {
-      finger[i].setPin(i+2);    // Set Finger Servo Pin
-      finger[i].setInit(0);     // Set Finger Servo Initial Position
-      finger[i].setMin(0);      // Set Finger Servo Minimum Position
-      finger[i].setMax(130);    // Set Finger Servo Maximum Position
-      finger[i].begin();        // Start Finger Servo Operation
-      finger[i].goInit();       // Move Servo To Initial Position
+      finger[i].setPin(i+2);  // Set Finger Servo Pin
+      finger[i].setInit(fingerValue[i].max);  // Set Finger Servo Initial Position
+      finger[i].setMin(fingerValue[i].min);   // Set Finger Servo Minimum Position
+      finger[i].setMax(fingerValue[i].max);   // Set Finger Servo Maximum Position
+      finger[i].begin();      // Start Finger Servo Operation
+      finger[i].goInit();     // Move Servo To Initial Position
     }
 
   }
@@ -40,22 +76,47 @@
   void loop() {
 
     // Min Reading Value (724 - 725) , Max Reading Value (800, 835)
-    if(millis() - scanPeriod >= 10) {
+    if(millis() - scanPeriod >= 100) {
+      
+      // Update Period
+      scanPeriod = millis();
 
-      // Looping Through Fingers
+      // Loop Through Fingers
       for(int i=0; i<5; i++) {
-        controlFingers(finger[i], prvValue[i], i+14, 724, 835, 0, 130);
+
+        // Reading New Value
+        fingerValue[i].prv        = constrain(analogRead(fingerValue[i].pin), fingerValue[i].min, fingerValue[i].max);
+
+        // Mapping The Value
+        unsigned int  percentage  = map(fingerValue[i].prv, fingerValue[i].min, fingerValue[i].max, 0, 100);
+
+        // Print Value
+        Serial.print(percentage, DEC);
+        Serial.print(" ");
+
+        // Finger Move
+        finger[i].percent(percentage);
+
+        // Prepare Data For Bluetooth
+        BluetoothData[i] = percentage;
+
       }
+
+      // New Line
+      Serial.println();
+
+      // Send Values Via Bluetooth
+      // Bluetooth.write(BluetoothData, 5);
 
     }
     
   }
 
 //==================================================================
-//  Function To Control A Finger
+//  Serial Control Fingers
 //==================================================================
 
-  void controlFingers(NewServo &servo, uint8_t &previous, uint8_t analogValue, unsigned int inMinValue, unsigned int inMaxValue, unsigned int outMinValue, unsigned int outMaxValue) {
+  void controlFingers(NewServo &servo, unsigned int &previous, uint8_t analogValue, unsigned int inMinValue, unsigned int inMaxValue, unsigned int outMinValue, unsigned int outMaxValue) {
 
       // Scan Period
       scanPeriod = millis();
@@ -64,10 +125,8 @@
       unsigned int  value = constrain(analogRead(analogValue), inMinValue, inMaxValue);
                     value = map(value, inMinValue, inMaxValue, outMinValue, outMaxValue);
 
-      // Do Change If Not Maching
       if(previous != value) {
         previous = value;
-        Bluetooth.write(prvValue, 5);
         Serial.println(previous);
         servo.move(previous);
       }
@@ -159,27 +218,49 @@
   }
 
 //==================================================================
-//  Receive Data From Bluetooth
+//  Get Analog Min Max Values
 //==================================================================
 
-  void receiveData() {
+  void getMinMaxValues() {
 
-    if (Bluetooth.available() >= 5) {
-      
-      // Read the received data into an array
-      byte receivedData[5];
-      Bluetooth.readBytes(receivedData, 5);
+    // Looping
+    for(int i=0; i<5; i++) {
 
-      // Move the servos based on the received byte values
-      Serial.print("Received data : ");
-      for(int i=0; i<5; i++) {
-        // Print the received byte values
-        Serial.print(receivedData[i]); Serial.print(" ");
-        finger[i].move(receivedData[i]);       // Move Servo To Initial Position
+      // Reading The Value
+      fingerValue[i].prv = analogRead(fingerValue[i].pin);
+
+      // If The Value Is Greater Than Max
+      if(fingerValue[i].max < fingerValue[i].prv) {
+        fingerValue[i].max = fingerValue[i].prv;      // Set Maximum
       }
-      Serial.println();
+
+      // If The Value Is Lower Than Min
+      if(fingerValue[i].min > fingerValue[i].prv) {
+        fingerValue[i].min = fingerValue[i].prv;      // Set Minimum
+      }
+
+      // Print Values
+      Serial.print(
+                    "[ (" +
+                    String(map(fingerValue[i].prv, fingerValue[i].min, fingerValue[i].max, 0, 100), DEC) + 
+                    ") pin : " +
+                    String(fingerValue[i].pin, DEC) + 
+                    ", min : " +
+                    String(fingerValue[i].min, DEC) +
+                    ", max : " +
+                    String(fingerValue[i].max, DEC) + 
+                    " ]"
+                  );
+
+      // To Print Only 4 Time
+      if(i < 4) {
+        Serial.print(" - ");
+      }
 
     }
+
+    // Print New Line
+    Serial.println();
 
   }
 
