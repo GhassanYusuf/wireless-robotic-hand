@@ -5,18 +5,18 @@
   #include        <SoftwareSerial.h>  // Software
   SoftwareSerial  Bluetooth(11, 10);  // Software Bluetooth
 
-  #include        <NewServo.h>        // Ghassan Library
-  NewServo        finger[5];          // 5 Servos
-
   struct AnaInput {
     uint8_t pin = 0;
-    unsigned int prv = 0;
+    unsigned int position = 0;
     unsigned int max = 0;
     unsigned int min = 1024;
   };
 
-  AnaInput        fingerValue[5];
-  unsigned int    prvValue[5];        // Previous Value Of The Servo Control
+  #include        <NewServo.h>        // Ghassan Library
+  NewServo        finger[5];          // 5 Servos
+
+  AnaInput        fingerValue[5];     // fingers control pin, movment, (min/max) boundaries.
+  unsigned int    positionValue[5];        // Previous Value Of The Servo Control
   unsigned int    BluetoothData[5];   // To Collect The Information To Be Sent Via Blue Tooth
 
   unsigned long   scanPeriod;         // Used For Count Time Between Operations
@@ -85,10 +85,10 @@
       for(int i=0; i<5; i++) {
 
         // Reading New Value
-        fingerValue[i].prv        = constrain(analogRead(fingerValue[i].pin), fingerValue[i].min, fingerValue[i].max);
+        fingerValue[i].position        = constrain(analogRead(fingerValue[i].pin), fingerValue[i].min, fingerValue[i].max);
 
         // Mapping The Value
-        unsigned int  percentage  = map(fingerValue[i].prv, fingerValue[i].min, fingerValue[i].max, 0, 100);
+        unsigned int  percentage  = map(fingerValue[i].position, fingerValue[i].min, fingerValue[i].max, 0, 100);
 
         // Print Value
         Serial.print(percentage, DEC);
@@ -227,22 +227,22 @@
     for(int i=0; i<5; i++) {
 
       // Reading The Value
-      fingerValue[i].prv = analogRead(fingerValue[i].pin);
+      fingerValue[i].position = analogRead(fingerValue[i].pin);
 
       // If The Value Is Greater Than Max
-      if(fingerValue[i].max < fingerValue[i].prv) {
-        fingerValue[i].max = fingerValue[i].prv;      // Set Maximum
+      if(fingerValue[i].max < fingerValue[i].position) {
+        fingerValue[i].max = fingerValue[i].position;      // Set Maximum
       }
 
       // If The Value Is Lower Than Min
-      if(fingerValue[i].min > fingerValue[i].prv) {
-        fingerValue[i].min = fingerValue[i].prv;      // Set Minimum
+      if(fingerValue[i].min > fingerValue[i].position) {
+        fingerValue[i].min = fingerValue[i].position;      // Set Minimum
       }
 
       // Print Values
       Serial.print(
                     "[ (" +
-                    String(map(fingerValue[i].prv, fingerValue[i].min, fingerValue[i].max, 0, 100), DEC) + 
+                    String(map(fingerValue[i].position, fingerValue[i].min, fingerValue[i].max, 0, 100), DEC) + 
                     ") pin : " +
                     String(fingerValue[i].pin, DEC) + 
                     ", min : " +
